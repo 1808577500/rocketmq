@@ -5,6 +5,7 @@ import com.zcx.rocket.base.MQSendResult;
 import com.zcx.rocket.base.TopicEnum;
 import com.zcx.rocket.error.RocketMQErrorEnum;
 import com.zcx.rocket.exception.RocketMQException;
+import com.zcx.rocketmq.producer.service.TransactionExecuterimpl;
 
 import java.util.List;
 
@@ -13,12 +14,14 @@ import org.apache.rocketmq.client.exception.MQClientException;
 import org.apache.rocketmq.client.producer.DefaultMQProducer;
 import org.apache.rocketmq.client.producer.MessageQueueSelector;
 import org.apache.rocketmq.client.producer.SendResult;
+import org.apache.rocketmq.client.producer.TransactionMQProducer;
 import org.apache.rocketmq.common.message.Message;
 import org.apache.rocketmq.common.message.MessageQueue;
 import org.apache.rocketmq.remoting.exception.RemotingException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.stereotype.Service;
 
 /**
@@ -34,7 +37,11 @@ public class ProducerServiceProcessor implements ProducerService {
 
 	Logger LOGGER = LoggerFactory.getLogger(ProducerServiceProcessor.class);
     @Autowired
+    @Qualifier("defaultMQProducer")
     DefaultMQProducer defaultMQProducer;
+    @Autowired
+    @Qualifier("transactionMQProducer")
+    TransactionMQProducer transactionMQProducer;
 
     /**
      * 发送消息的延时等级（默认为1：不延时）
@@ -113,6 +120,39 @@ public class ProducerServiceProcessor implements ProducerService {
         	LOGGER.error(e.getMessage(), e);
             mqSendResult = new MQSendResult(e.getErrMsg(), e);
         } catch (MQClientException | RemotingException | MQBrokerException | InterruptedException e) {
+        	LOGGER.error(e.getMessage(), e);
+            mqSendResult = new MQSendResult("消息发送失败{}", e);
+        }
+        return mqSendResult == null ? new MQSendResult() : mqSendResult;
+	}
+
+	/**   
+	 * <p>Title: sendByTransaction</p>   
+	 * <p>Description: </p>   
+	 * @param topic
+	 * @param tag
+	 * @param keys
+	 * @param msg
+	 * @param orderId
+	 * @return   
+	 * @see com.zcx.rocketmq.producer.config.ProducerService#sendByTransaction(com.zcx.rocket.base.TopicEnum, java.lang.String, java.lang.String, java.lang.String, java.lang.Long)   
+	 */  
+	@Override
+	public MQSendResult sendByTransaction(TopicEnum topic, String tag, String keys, String msg, Long orderId) {
+
+		MQSendResult mqSendResult = null;
+        try {
+            this.validateSendMsg(topic, tag, msg);
+            Message sendMsg = new Message(topic.getCode(), tag, keys, msg.getBytes());
+            sendMsg.setDelayTimeLevel(delayTimeLevel);
+            TransactionExecuterimpl TransactionExecuterimpl = new TransactionExecuterimpl();
+            SendResult sendResult = transactionMQProducer.sendMessageInTransaction(sendMsg, orderId);
+            LOGGER.info(sendResult.toString());
+            mqSendResult = new MQSendResult(sendResult);
+        } catch (RocketMQException e) {
+        	LOGGER.error(e.getMessage(), e);
+            mqSendResult = new MQSendResult(e.getErrMsg(), e);
+        } catch (MQClientException e) {
         	LOGGER.error(e.getMessage(), e);
             mqSendResult = new MQSendResult("消息发送失败{}", e);
         }

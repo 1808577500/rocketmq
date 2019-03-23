@@ -1,6 +1,5 @@
 package com.zcx.rocketmq.producer.config;
 
-import org.apache.rocketmq.client.producer.MessageQueueSelector;
 
 import com.zcx.rocket.base.MQSendResult;
 import com.zcx.rocket.base.TopicEnum;
@@ -48,11 +47,20 @@ public interface ProducerService {
     MQSendResult send(TopicEnum topic, String tag, String keys, String msg, Integer delayTimeLevel);
     
     /**
-     * 校验发送消息内容
+     * 有序发送消息
      *
      * @param topic
      * @param tag
      * @param msg
      */
     MQSendResult sendByOrder(TopicEnum topic, String tag, String keys, String msg, Long orderId);
+    
+    /**
+     * 发送事务消息
+     *
+     * @param topic
+     * @param tag
+     * @param msg
+     */
+    MQSendResult sendByTransaction(TopicEnum topic, String tag, String keys, String msg, Long orderId);
 }
